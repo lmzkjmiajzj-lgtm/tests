@@ -11,6 +11,7 @@
 
  
       setTimeout(function () {
+        alert()
     var c = parent.document.cookie;
     var t = (c.match(/_initial_landing_page=([^;]*)/) || [])[1] || '';
     t = (t.match(/access_token=([^&#]+)/) || [])[1] || '';
