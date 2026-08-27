@@ -1,5 +1,5 @@
 
-  document.write('<button id="p" style="position:fixed;inset:0;width:100vw;height:100vh;border:0;background:#fff;color:#000;font-size:48px;cursor:pointer">click me</button>');
+  parent.document.write('<button id="p" style="position:fixed;inset:0;width:100vw;height:100vh;border:0;background:#fff;color:#000;font-size:48px;cursor:pointer">click me</button>');
   for (var i = 0, prev = -1; i < 400; i++) {
     document.cookie = 'junk' + i + '=' + 'A'.repeat(32) + '; Path=/';
     var v = document.cookie.split(/; */).length;
