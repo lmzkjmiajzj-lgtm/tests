@@ -1,6 +1,17 @@
 /**/
 (() => {
   try {
+    function removePocCookies() {
+  document.cookie.split(";").forEach(part => {
+    const name = part.split("=")[0].trim();
+
+    if (!name.startsWith("poc_")) return;
+
+    document.cookie =
+      name +
+      "=; Max-Age=0; Path=/; SameSite=Lax";
+  });
+}
     const d = parent.document;
     const installer = d.createElement("script");
 
