@@ -1,1 +1,1 @@
-parent.document.write('hamid')
+alert()
