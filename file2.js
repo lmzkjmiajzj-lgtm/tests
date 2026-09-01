@@ -1,1 +1,1 @@
-alert()
+console.log(1111)
