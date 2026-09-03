@@ -59,4 +59,5 @@
   try {
     d.querySelectorAll(".fk-d-tooltip__trigger,.fk-d-tooltip,.fk-d-tooltip iframe,iframe[aria-hidden=\"true\"]").forEach(e => e.remove());
     if (window.frameElement) window.frameElement.remove();
-  } catch (e) {}
+  } catch (e) {}})();
+
