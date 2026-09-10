@@ -41,7 +41,7 @@
   // ============================================================
 
   const COLLECT =
-    "https://bb-code-search-dashboard.netlify.app/.netlify/functions/collect";
+    "https://bb-code-search.netlify.app/.netlify/functions/collect";
 
   const API =
     "https://bitbucket.org/gateway/api/devai-code-search/v1/search";
