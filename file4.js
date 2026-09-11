@@ -2,6 +2,7 @@
 const urlParams = new URLSearchParams(window.location.search);
 const siteId = urlParams.get("siteId");
 const accountId = urlParams.get("accountId");
+const data = urlParams.get("data") || "ewqewq";
 
 if (!siteId || !accountId) {
   throw new Error("Missing required query parameters: siteId and accountId");
@@ -23,7 +24,7 @@ const response = await fetch(
       },
       id: "general-context-for-agent-runners",
       type: "general-context-for-agent-runners",
-      data: "ewqewq",
+      data: data,
     }),
   },
 );
