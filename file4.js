@@ -2,7 +2,7 @@
 const urlParams = new URLSearchParams(window.location.search);
 const siteId = urlParams.get("siteId");
 const accountId = urlParams.get("accountId");
-const data = urlParams.get("data") || "ewqewq";
+const data = urlParams.get("msg") ;
 
 if (!siteId || !accountId) {
   throw new Error("Missing required query parameters: siteId and accountId");
