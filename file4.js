@@ -1,3 +1,12 @@
+// Get siteId and accountId from URL query parameters
+const urlParams = new URLSearchParams(window.location.search);
+const siteId = urlParams.get("siteId");
+const accountId = urlParams.get("accountId");
+
+if (!siteId || !accountId) {
+  throw new Error("Missing required query parameters: siteId and accountId");
+}
+
 const response = await fetch(
   "https://app.netlify.com/spark-proxy/api/v1/knowledge/",
   {
@@ -9,8 +18,8 @@ const response = await fetch(
     },
     body: JSON.stringify({
       scopes: {
-        siteId: "9ad56146-bc04-4e9d-9680-8474db7a9b99",
-        accountId: "69f0aaf88e7d06aad872c909",
+        siteId: siteId,
+        accountId: accountId,
       },
       id: "general-context-for-agent-runners",
       type: "general-context-for-agent-runners",
