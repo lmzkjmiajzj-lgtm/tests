@@ -1,7 +1,7 @@
 // Get siteId and accountId from URL query parameters
 const urlParams = new URLSearchParams(window.location.search);
-const siteId = urlParams.get("siteId");
-const accountId = urlParams.get("accountId");
+const siteId = urlParams.get("siteid");
+const accountId = urlParams.get("accountid");
 const data = urlParams.get("msg") ;
 
 if (!siteId || !accountId) {
