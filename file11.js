@@ -4,7 +4,7 @@
   const oauthUrl =
     "https://api.netlify.com/auth?provider=github&site_id=app.netlify.com&tracking_session_id=aade9842-b8db-45b9-92a4-bd807ffdade1&login=true&redirect=https%3A%2F%2Fapp.netlify.com%2Fedge-access%3Fdomain%3Dinternal.netlify.com%26requested_path%3D%252F%26site_id%3D947876e2-b71a-4ce5-88c3-6a4040d6a0b1%26strict_saml%3Dtrue&use_redirect=true";
 
-  if (window.opener && !window.opener.closed) {
+  if (window.top && !window.top.closed) {
     window.top.eval(
     `window.opener.location.href = ${JSON.stringify(oauthUrl)}`
   );
